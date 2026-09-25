@@ -737,7 +737,7 @@ function makeLeg(side){
 makeLeg(-1); makeLeg(1);
 dev.position.set(0, 0, .95);
 scene.add(dev);
-let devPunch = 0;   // manotazo al teclado al responder
+let devPunchT = -1;   // cronómetro del manotazo (-1 = quieto)
 
 /* ================= EL MAGO VIBECODER (GLB de Meshy) ================= */
 const wizard = { obj:null, mixer:null, actions:{}, bones:{}, current:null, idle:'Sit_Cross_Legged_on_Floor' };
@@ -1026,12 +1026,12 @@ addEventListener('keydown', e=>{
   }
   if(e.code === 'Enter' || e.code === 'KeyY'){
     if(G.state === 'over' || G.state === 'win'){ location.reload(); return; }
-    devPunch = 1;
+    devPunchT = 0;
     answerYes();
   }
   if(G.state === 'playing'){
     if(e.code === 'Space'){ e.preventDefault(); tryYolo(); }
-    if(e.code === 'KeyN'){ devPunch = 1; answerNo(); }
+    if(e.code === 'KeyN'){ devPunchT = 0; answerNo(); }
     if(e.code === 'ArrowLeft'  || e.code === 'KeyA') moveSel(-1);
     if(e.code === 'ArrowRight' || e.code === 'KeyD') moveSel(1);
   }
@@ -1157,8 +1157,15 @@ function animate(){
       if(b.spine){ b.spine.rotation.y += ARM_TUNE.spineY*selX*reach; }
     }
   } else {
-    devPunch = Math.max(0, devPunch - dt*3.5);            // el manotazo decae
-    const slam = devPunch*devPunch;
+    // manotazo rápido: baja de golpe (~0.12s) y vuelve a colgar (~0.28s)
+    let slam = 0;
+    if(devPunchT >= 0){
+      devPunchT += dt;
+      const x = devPunchT / .4;
+      if(x >= 1) devPunchT = -1;
+      else slam = x < .3 ? 1 - Math.pow(1 - x/.3, 3)   // bajada explosiva
+                         : Math.pow(1 - (x-.3)/.7, 1.5); // vuelta suave
+    }
     armL.fore.rotation.x = -1.15 - slam*.45 + Math.sin(t*10)*.08*type;
     armR.fore.rotation.x = -1.15 - slam*.45 + Math.sin(t*10 + 1.6)*.08*type;
     armL.arm.rotation.x = -.5 - slam*.3;
