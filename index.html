@@ -29,8 +29,37 @@
     width:38px; height:24px; border:2px solid #3aff88; border-radius:3px;
     box-shadow:0 0 10px rgba(60,255,140,.5); transition:all .4s;
   }
+  .scr.active { outline:2px solid #8fd6ff; outline-offset:3px; box-shadow:0 0 14px rgba(140,220,255,.8); }
   .scr.prompt { border-color:#ff4455; box-shadow:0 0 14px rgba(255,60,80,.9); animation:blink .4s infinite; }
-  .scr.dead { border-color:#333; box-shadow:none; opacity:.35; }
+  .scr.dead { border-color:#333; box-shadow:none; opacity:.35; outline:none; }
+
+  #yolo-hud {
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    z-index:10; pointer-events:none; text-align:center;
+    color:#8fa0c0; font-size:12px; letter-spacing:3px;
+    opacity:0; transition:opacity .8s;
+    text-shadow:0 0 6px rgba(120,140,180,.4);
+  }
+  #yolo-hud.on { opacity:1; }
+  #yolo-bar {
+    width:150px; height:8px; margin-top:5px;
+    background:#141822; border:1px solid #2a3040; border-radius:4px; overflow:hidden;
+  }
+  #yolo-fill { height:100%; width:0%; background:#8fd6ff; box-shadow:0 0 10px rgba(140,220,255,.8); transition:width .25s; }
+  #yolo-fill.full {
+    background:linear-gradient(90deg,#ff3355,#ffcc33,#3aff88,#33ccff,#cc66ff,#ff3355);
+    background-size:200% 100%; animation:rainbow-slide 1s linear infinite;
+  }
+  #yolo-hud.full { color:#fff; animation:blink .6s infinite; }
+
+  #yolo-banner {
+    display:none; position:fixed; top:16%; left:0; right:0; text-align:center;
+    font-size:clamp(26px,5vw,52px); font-weight:bold; letter-spacing:8px;
+    color:#fff; z-index:12; pointer-events:none;
+    animation:rainbow-text .5s linear infinite, pulse .5s infinite;
+  }
+  body.yolo-mode #yolo-banner { display:block; }
+  body.yolo-mode #vignette { animation:rainbow-glow .8s linear infinite; }
 
   #msg {
     position:fixed; bottom:60px; left:0; right:0; text-align:center;
@@ -100,6 +129,21 @@
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
   @keyframes pulse { 0%,100%{opacity:1; transform:scale(1)} 50%{opacity:.6; transform:scale(.97)} }
   @keyframes flicker { 0%,93%,95%,100%{opacity:1} 94%{opacity:.6} 97%{opacity:.8} }
+  @keyframes rainbow-slide { 0%{background-position:0% 0} 100%{background-position:200% 0} }
+  @keyframes rainbow-text {
+    0%{color:#ff3355; text-shadow:0 0 20px #ff3355}
+    25%{color:#ffcc33; text-shadow:0 0 20px #ffcc33}
+    50%{color:#3aff88; text-shadow:0 0 20px #3aff88}
+    75%{color:#33ccff; text-shadow:0 0 20px #33ccff}
+    100%{color:#ff3355; text-shadow:0 0 20px #ff3355}
+  }
+  @keyframes rainbow-glow {
+    0%{box-shadow:inset 0 0 120px rgba(255,51,85,.35)}
+    25%{box-shadow:inset 0 0 120px rgba(255,204,51,.35)}
+    50%{box-shadow:inset 0 0 120px rgba(58,255,136,.35)}
+    75%{box-shadow:inset 0 0 120px rgba(51,204,255,.35)}
+    100%{box-shadow:inset 0 0 120px rgba(255,51,85,.35)}
+  }
 </style>
 </head>
 <body>
@@ -114,6 +158,11 @@
   <div class="scr" id="scr1"></div>
   <div class="scr" id="scr2"></div>
 </div>
+<div id="yolo-hud">
+  <span id="yolo-label">YOLO</span>
+  <div id="yolo-bar"><div id="yolo-fill"></div></div>
+</div>
+<div id="yolo-banner">🔥 YOLO MODE 🔥</div>
 <div id="msg"></div>
 <div id="vol-hud">
   <span id="vol-label">♪ MUSIC</span> [ + / - ]
@@ -152,18 +201,25 @@ const LANG = {
     screenNames: ['LEFT', 'CENTER', 'RIGHT'],
     startMsg: 'Shift started. Good luck, "engineer".',
     alert: n => `⚠ ${n} SCREEN NEEDS YOUR APPROVAL!`,
+    wrongScreen: 'Wrong screen! Move with ← →',
     noMsg: 'You said NO. That screen has been fired.',
     timeoutMsg: 'Too slow. The AI went out for coffee.',
+    yoloReady: 'YOLO MODE READY — PRESS SPACE!',
+    yoloOn: '🔥 YOLO MODE: AUTO-YES ENGAGED 🔥',
+    yoloEnd: 'YOLO over. Back to reality.',
     promptTitle: '⚠ CONTINUE? [Y/N]',
-    promptHelp: 'ENTER = yes      N = no',
+    promptHelp: 'ENTER/Y = yes      N = no',
     noSignal: 'NO SIGNAL',
     langFooter: 'LANGUAGE: <span class="key">1</span> ENGLISH &nbsp;·&nbsp; <span class="key">2</span> ESPAÑOL &nbsp;·&nbsp; ♪ VOL <span class="key">+</span><span class="key">-</span>',
     introHtml: `
       <h1>PROGRAMMER<br>SIMULATOR <span>2026</span></h1>
       <p>The AI writes the code. You have the most important job:<br>
-      press <span class="key">ENTER</span> when the system asks <b>CONTINUE? [Y/N]</b>.</p>
-      <p>Press <span class="key">N</span> or run out of time and that screen dies.<br>
+      press <span class="key">ENTER</span> or <span class="key">Y</span> when the system asks <b>CONTINUE? [Y/N]</b>.</p>
+      <p>Move between screens with <span class="key">←</span><span class="key">→</span> — you can only answer
+      from the screen you're sitting at. Press <span class="key">N</span> or run out of time and that screen dies.<br>
       Lose all 3 screens and you'll be replaced. Survive 5 minutes.</p>
+      <p>Fill the <b>YOLO</b> bar with good answers and hit <span class="key">SPACE</span>:<br>
+      15 seconds of automatic YES, star-power style.</p>
       <p class="pulse">[ PRESS ENTER TO CLOCK IN ]</p>`,
     overHtml: (score, time) => `
       <h2>ALL 3 SCREENS ARE DEAD</h2>
@@ -220,18 +276,25 @@ const LANG = {
     screenNames: ['IZQUIERDA', 'CENTRO', 'DERECHA'],
     startMsg: 'Jornada iniciada. Buena suerte, "ingeniero".',
     alert: n => `⚠ ¡PANTALLA ${n} PIDE TU APROBACIÓN!`,
+    wrongScreen: '¡Pantalla equivocada! Muévete con ← →',
     noMsg: 'Dijiste que NO. Esa pantalla ha sido despedida.',
     timeoutMsg: 'Se te pasó el arroz. La IA se fue a por café.',
+    yoloReady: 'MODO YOLO LISTO — ¡PULSA ESPACIO!',
+    yoloOn: '🔥 MODO YOLO: AUTO-SÍ ACTIVADO 🔥',
+    yoloEnd: 'Se acabó el YOLO. Vuelta a la realidad.',
     promptTitle: '⚠ ¿CONTINUAR? [Y/N]',
-    promptHelp: 'ENTER = sí      N = no',
+    promptHelp: 'ENTER/Y = sí      N = no',
     noSignal: 'SIN SEÑAL',
     langFooter: 'IDIOMA: <span class="key">1</span> ENGLISH &nbsp;·&nbsp; <span class="key">2</span> ESPAÑOL &nbsp;·&nbsp; ♪ VOL <span class="key">+</span><span class="key">-</span>',
     introHtml: `
       <h1>PROGRAMMER<br>SIMULATOR <span>2026</span></h1>
       <p>La IA escribe el código. Tú tienes el trabajo más importante:<br>
-      pulsar <span class="key">ENTER</span> cuando el sistema pregunte <b>¿CONTINUAR? [Y/N]</b>.</p>
-      <p>Si pulsas <span class="key">N</span> o se acaba el tiempo, esa pantalla muere.<br>
+      pulsar <span class="key">ENTER</span> o <span class="key">Y</span> cuando el sistema pregunte <b>¿CONTINUAR? [Y/N]</b>.</p>
+      <p>Muévete entre pantallas con <span class="key">←</span><span class="key">→</span> — solo puedes responder
+      desde la pantalla en la que estás. Si pulsas <span class="key">N</span> o se acaba el tiempo, esa pantalla muere.<br>
       Pierde las 3 pantallas y serás reemplazado. Sobrevive 5 minutos.</p>
+      <p>Llena la barra <b>YOLO</b> acertando y pulsa <span class="key">ESPACIO</span>:<br>
+      15 segundos de SÍ automático, estilo estrella de Mario.</p>
       <p class="pulse">[ PULSA ENTER PARA FICHAR ]</p>`,
     overHtml: (score, time) => `
       <h2>LAS 3 PANTALLAS HAN MUERTO</h2>
@@ -310,10 +373,14 @@ const sDead   = () => tone(400,.7,'sawtooth',.14,0,60);
 const sStart  = () => { tone(60,.5,'sine',.3,0,45); tone(1200,.15,'square',.06,.1,300); };
 const sWin    = () => [523,659,784,1046].forEach((f,i)=>tone(f,.25,'triangle',.14,i*.14));
 const sLose   = () => [400,300,220,140].forEach((f,i)=>tone(f,.35,'sawtooth',.12,i*.22));
+const sMove   = d => tone(620 + d*90, .06, 'sine', .07);
+const sWrong  = () => tone(200, .18, 'sawtooth', .09);
+const sYolo   = () => [392,523,659,784,1046,1318].forEach((f,i)=>tone(f,.12,'square',.12,i*.07));
 
 /* ================= MÚSICA DE FONDO ================= */
 const bgm = new Audio('vibemusic_web.mp3');
 bgm.loop = true;
+bgm.preservesPitch = false;   // en modo YOLO suena acelerada tipo ardilla
 bgm.volume = parseFloat(localStorage.getItem('ps2026_vol') ?? '0.25');
 let volHotTimer = null;
 function setVol(v){
@@ -361,6 +428,9 @@ scene.add(deskSpot, deskSpot.target);
 const alertLight = new THREE.PointLight(0xff2233, 0, 9);
 alertLight.position.set(0, 2.6, 0.6);
 scene.add(alertLight);
+const wizardGlow = new THREE.PointLight(0xffffff, 0, 4);
+wizardGlow.position.set(0, 1.4, 0.9);
+scene.add(wizardGlow);
 
 /* ================= MATERIALES ================= */
 const M = {
@@ -497,6 +567,23 @@ class Terminal {
   }
 }
 
+/* ================= AURA DE SELECCIÓN ================= */
+let _auraTex = null;
+function getAuraTexture(){
+  if(_auraTex) return _auraTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d');
+  const grd = x.createRadialGradient(64, 64, 18, 64, 64, 64);
+  grd.addColorStop(0, 'rgba(255,255,255,.9)');
+  grd.addColorStop(.55, 'rgba(255,255,255,.35)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = grd;
+  x.fillRect(0, 0, 128, 128);
+  _auraTex = new THREE.CanvasTexture(c);
+  return _auraTex;
+}
+
 /* ================= MONITORES ================= */
 const monitors = [];
 function makeMonitor(x, z, ry, idx){
@@ -508,6 +595,14 @@ function makeMonitor(x, z, ry, idx){
     new THREE.MeshBasicMaterial({ map: term.tex }));
   screen.position.z = .035;
   g.add(screen);
+  // aura de la pantalla seleccionada
+  const aura = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 1.5),
+    new THREE.MeshBasicMaterial({
+      map: getAuraTexture(), transparent:true, opacity:0,
+      blending:THREE.AdditiveBlending, depthWrite:false, color:0x66ccff,
+    }));
+  aura.position.z = -.04;
+  g.add(aura);
   const neck = new THREE.Mesh(new THREE.BoxGeometry(.08, .35, .06), M.frame);
   neck.position.y = -.6;
   g.add(neck);
@@ -520,13 +615,14 @@ function makeMonitor(x, z, ry, idx){
   const light = new THREE.PointLight(0x33ff88, .8, 3.2, 1.8);
   light.position.set(x*1.05, 1.6, z + .55);
   scene.add(light);
-  monitors.push({ group:g, term, light, idx });
+  monitors.push({ group:g, term, light, aura, idx });
 }
 makeMonitor(-1.18, -0.72,  .42, 0);
 makeMonitor( 0,    -0.95,  0,   1);
 makeMonitor( 1.18, -0.72, -.42, 2);
 
 /* ================= TECLADO RGB ================= */
+let kbLight = null;
 (function makeKeyboard(){
   const kc = document.createElement('canvas');
   kc.width = 256; kc.height = 80;
@@ -543,9 +639,9 @@ makeMonitor( 1.18, -0.72, -.42, 2);
     new THREE.MeshBasicMaterial({ map:ktex }));
   kb.position.set(0, 1.07, 0.12);
   scene.add(kb);
-  const klight = new THREE.PointLight(0x8833ff, .9, 1.4);
-  klight.position.set(0, 1.25, 0.12);
-  scene.add(klight);
+  kbLight = new THREE.PointLight(0x8833ff, .9, 1.4);
+  kbLight.position.set(0, 1.25, 0.12);
+  scene.add(kbLight);
 })();
 
 /* ================= TAZA ================= */
@@ -637,7 +733,9 @@ dev.position.set(0, 0, .95);
 scene.add(dev);
 
 /* ================= EL MAGO VIBECODER (GLB de Meshy) ================= */
-const wizard = { obj:null, mixer:null, actions:{}, current:null, idle:'Sit_Cross_Legged_on_Floor' };
+const wizard = { obj:null, mixer:null, actions:{}, bones:{}, current:null, idle:'Sit_Cross_Legged_on_Floor' };
+// ajustes de brazos sobre la animación (sube/baja estos valores si el brazo se mueve raro)
+const ARM_TUNE = { reachX: -.34, foreX: -.42, sideZ: .5, spineY: .22 };
 
 function playWizard(name, fade=.35, once=false, timeScale=1){
   if(!wizard.mixer) return;
@@ -659,18 +757,32 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
   .load('mago_web.glb', gltf=>{
     const obj = gltf.scene;
     obj.scale.setScalar(.95);
-    obj.position.set(0, .6, .85);   // levitando sobre la silla
+    obj.position.set(0, .62, .97);  // levitando sobre la silla
     obj.rotation.y = Math.PI;       // mirando a los monitores
     scene.add(obj);
     scene.remove(dev);              // sustituye al muñeco procedural
     wizard.obj = obj;
+    obj.traverse(n=>{
+      if(!n.isBone) return;
+      const nm = n.name;
+      if(nm.endsWith('RightArm'))      wizard.bones.armR  = n;
+      if(nm.endsWith('RightForeArm'))  wizard.bones.foreR = n;
+      if(nm.endsWith('LeftArm'))       wizard.bones.armL  = n;
+      if(nm.endsWith('LeftForeArm'))   wizard.bones.foreL = n;
+      if(nm.endsWith('Spine1'))        wizard.bones.spine = n;
+    });
     wizard.mixer = new THREE.AnimationMixer(obj);
     for(const clip of gltf.animations) wizard.actions[clip.name] = wizard.mixer.clipAction(clip);
     playWizard(wizard.idle);
     wizard.mixer.addEventListener('finished', ()=>{
       if(G.state === 'playing') playWizard(wizard.idle, .4);
     });
-  }, undefined, err => console.warn('GLB no cargado; usando muñeco procedural:', err));
+  }, undefined, err => {
+    console.warn('GLB no cargado; usando muñeco procedural:', err);
+    showMsg(location.protocol === 'file:'
+      ? '⚠ El navegador bloquea mago_web.glb desde file:// — usa un servidor local: python -m http.server 8000'
+      : '⚠ No se encontró mago_web.glb — súbelo a la misma carpeta que index.html', 9000);
+  });
 
 /* ================= ESTADO DEL JUEGO ================= */
 const G = {
@@ -682,7 +794,12 @@ const G = {
   introT: 0,
   shake: 0,
   punch: 0,
+  sel: 1,               // pantalla seleccionada (0 izq, 1 centro, 2 dcha)
+  yolo: 0,              // carga 0..1
+  yoloActive: 0,        // segundos restantes de modo yolo
 };
+const YOLO_TIME = 15;
+let selSmooth = 1;      // para transiciones suaves de cámara/cuerpo
 const mouse = { x:0, y:0 };
 addEventListener('mousemove', e=>{
   mouse.x = (e.clientX/innerWidth - .5);
@@ -712,6 +829,22 @@ $('vol-label').textContent = S.musicLabel;
 $('credit').innerHTML = S.creditCorner;
 setVol(bgm.volume);   // pinta la barra inicial
 
+function refreshScrHud(){
+  for(const m of monitors){
+    $('scr'+m.idx).className = 'scr'
+      + (m.term.state === 'dead'   ? ' dead'   : '')
+      + (m.term.state === 'prompt' ? ' prompt' : '')
+      + (m.idx === G.sel && m.term.state !== 'dead' ? ' active' : '');
+  }
+}
+
+function refreshYoloHud(){
+  const pct = G.yoloActive > 0 ? G.yoloActive/YOLO_TIME : G.yolo;
+  $('yolo-fill').style.width = (pct*100) + '%';
+  $('yolo-fill').classList.toggle('full', G.yolo >= 1 || G.yoloActive > 0);
+  $('yolo-hud').classList.toggle('full', G.yolo >= 1 && !G.yoloActive);
+}
+
 function startGame(){
   AC().resume && AC().resume();
   G.state = 'playing';
@@ -721,11 +854,25 @@ function startGame(){
   overlay.classList.add('hidden');
   $('hud').classList.add('on');
   $('screens-hud').classList.add('on');
+  $('yolo-hud').classList.add('on');
+  refreshScrHud();
+  refreshYoloHud();
   showMsg(S.startMsg, 3000);
 }
 
 function aliveScreens(){ return monitors.filter(m => m.term.state !== 'dead'); }
 function promptingScreens(){ return monitors.filter(m => m.term.state === 'prompt'); }
+
+function moveSel(dir){
+  const alive = aliveScreens().map(m => m.idx);
+  if(!alive.length) return;
+  let i = alive.indexOf(G.sel);
+  i = i < 0 ? 0 : (i + dir + alive.length) % alive.length;
+  if(alive[i] === G.sel) return;
+  G.sel = alive[i];
+  sMove(dir);
+  refreshScrHud();
+}
 
 function tryPrompt(){
   const cand = aliveScreens().filter(m => m.term.state === 'code');
@@ -737,7 +884,7 @@ function tryPrompt(){
   sAlarm();
   G.shake = Math.max(G.shake, .12);
   showMsg(S.alert(S.screenNames[m.idx]), 2000);
-  $('scr'+m.idx).classList.add('prompt');
+  refreshScrHud();
 }
 
 function killScreen(m, reason){
@@ -745,8 +892,8 @@ function killScreen(m, reason){
   sDead();
   G.shake = Math.max(G.shake, .3);
   playWizard('Sit_Finger_Wag_No', .25, true);   // el mago lamenta la pérdida
-  $('scr'+m.idx).classList.remove('prompt');
-  $('scr'+m.idx).classList.add('dead');
+  if(G.sel === m.idx && aliveScreens().length) G.sel = aliveScreens()[0].idx;
+  refreshScrHud();
   showMsg(reason, 2800);
   if(!aliveScreens().length) gameOver();
 }
@@ -755,23 +902,64 @@ function answerYes(){
   sClack();
   const p = promptingScreens();
   if(!p.length){ G.score += 5; return; }
-  const m = p[0];
+  const m = monitors[G.sel];
+  if(m.term.state !== 'prompt'){   // hay un aviso, pero no estás sentado ahí
+    sWrong();
+    G.shake = Math.max(G.shake, .08);
+    showMsg(S.wrongScreen);
+    return;
+  }
   m.term.state = 'code';
-  $('scr'+m.idx).classList.remove('prompt');
+  refreshScrHud();
   G.score += 50;
   sYes();
   playWizard('Sit_Cheer_with_Left_Hand', .25, true);   // celebra sin levantarse
-  showMsg(S.yesMsgs[(Math.random()*S.yesMsgs.length)|0]);
+  const wasFull = G.yolo >= 1;
+  G.yolo = Math.min(1, G.yolo + .2);
+  refreshYoloHud();
+  if(G.yolo >= 1 && !wasFull){ tone(1046,.2,'square',.12); showMsg(S.yoloReady, 2600); }
+  else showMsg(S.yesMsgs[(Math.random()*S.yesMsgs.length)|0]);
 }
 
 function answerNo(){
-  const p = promptingScreens();
-  if(!p.length) return;
-  killScreen(p[0], S.noMsg);
+  const m = monitors[G.sel];
+  if(m.term.state !== 'prompt') return;
+  killScreen(m, S.noMsg);
+}
+
+/* ================= MODO YOLO ================= */
+function tryYolo(){
+  if(G.state !== 'playing' || G.yoloActive > 0 || G.yolo < 1) return;
+  G.yolo = 0;
+  G.yoloActive = YOLO_TIME;
+  sYolo();
+  bgm.playbackRate = 1.4;                     // música turbo
+  document.body.classList.add('yolo-mode');
+  $('yolo-banner').textContent = S.yoloOn;
+  playWizard('Sit_Cheer_with_Left_Hand', .2); // celebración en bucle
+  if(wizard.current) wizard.current.timeScale = 1.7;
+  G.shake = Math.max(G.shake, .25);
+  showMsg(S.yoloOn, 2500);
+  refreshYoloHud();
+}
+function endYolo(silent){
+  if(!document.body.classList.contains('yolo-mode')) return;
+  document.body.classList.remove('yolo-mode');
+  G.yoloActive = 0;
+  bgm.playbackRate = 1;
+  bloom.strength = .75;
+  camera.fov = 48;
+  camera.updateProjectionMatrix();
+  wizardGlow.intensity = 0;
+  neonLight.color.setHex(0xff2fd6);
+  playWizard(wizard.idle, .5);
+  if(!silent) showMsg(S.yoloEnd);
+  refreshYoloHud();
 }
 
 function gameOver(){
   G.state = 'over';
+  endYolo(true);
   sLose();
   alertLight.intensity = 4;
   playWizard(wizard.idle, .6, false, .25);   // se hunde en cámara lenta
@@ -779,6 +967,7 @@ function gameOver(){
 }
 function gameWin(){
   G.state = 'win';
+  endYolo(true);
   sWin();
   playWizard('Sit_Cheer_with_Left_Hand', .4);   // celebración en bucle
   setOverlay(S.winHtml(G.score, aliveScreens().length));
@@ -800,11 +989,16 @@ addEventListener('keydown', e=>{
     if(e.code === 'Enter'){ startGame(); return; }
     return;
   }
-  if(e.code === 'Enter'){
+  if(e.code === 'Enter' || e.code === 'KeyY'){
     if(G.state === 'over' || G.state === 'win'){ location.reload(); return; }
     answerYes();
   }
-  if(e.code === 'KeyN' && G.state === 'playing') answerNo();
+  if(G.state === 'playing'){
+    if(e.code === 'Space'){ e.preventDefault(); tryYolo(); }
+    if(e.code === 'KeyN') answerNo();
+    if(e.code === 'ArrowLeft'  || e.code === 'KeyA') moveSel(-1);
+    if(e.code === 'ArrowRight' || e.code === 'KeyD') moveSel(1);
+  }
 });
 
 /* ================= BUCLE ================= */
@@ -815,6 +1009,8 @@ function animate(){
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), .05);
   const t = clock.elapsedTime;
+  selSmooth += (G.sel - selSmooth) * Math.min(1, dt*5);
+  const selX = selSmooth - 1;   // -1 izq, 0 centro, 1 dcha
 
   /* --- cámara --- */
   if(G.state === 'intro'){
@@ -825,7 +1021,7 @@ function animate(){
     camera.lookAt(CAM_LOOK);
   } else {
     const sway = .04;
-    camera.position.x = CAM_BASE.x + Math.sin(t*.5)*sway + mouse.x*.35;
+    camera.position.x = CAM_BASE.x + selX*.5 + Math.sin(t*.5)*sway + mouse.x*.35;
     camera.position.y = CAM_BASE.y + Math.sin(t*.7)*sway*.6 - mouse.y*.2;
     camera.position.z = CAM_BASE.z - G.punch*.55;
     G.punch = Math.max(0, G.punch - dt*2.2);
@@ -834,7 +1030,7 @@ function animate(){
       camera.position.y += (Math.random()-.5)*G.shake;
       G.shake = Math.max(0, G.shake - dt*.8);
     }
-    camera.lookAt(CAM_LOOK);
+    camera.lookAt(CAM_LOOK.x + selX*.7, CAM_LOOK.y, CAM_LOOK.z);
   }
 
   /* --- juego --- */
@@ -846,6 +1042,7 @@ function animate(){
     if(G.nextPrompt <= 0){
       tryPrompt();
       G.nextPrompt = THREE.MathUtils.lerp(8, 3, prog) * (.7 + Math.random()*.6);
+      if(G.yoloActive > 0) G.nextPrompt *= .45;   // en yolo llueven avisos
     }
     for(const m of monitors){
       if(m.term.state === 'prompt'){
@@ -864,7 +1061,7 @@ function animate(){
     }
   }
 
-  /* --- terminales y luces de pantalla --- */
+  /* --- terminales, auras y luces de pantalla --- */
   const anyPrompt = promptingScreens().length > 0;
   alertLight.intensity = THREE.MathUtils.lerp(
     G.state === 'over' ? 4 : (anyPrompt ? 2.5 + Math.sin(t*10)*1.2 : 0),
@@ -877,23 +1074,64 @@ function animate(){
     const tgt = s === 'dead' ? 0 : s === 'prompt' ? 2.4 + Math.sin(t*10)*.8 : .8;
     m.light.intensity += (tgt - m.light.intensity) * Math.min(1, dt*8);
     m.light.color.setHex(s === 'prompt' ? 0xff3344 : 0x33ff88);
+    const auraTgt = (m.idx === G.sel && s !== 'dead' && G.state !== 'over')
+      ? .4 + .12*Math.sin(t*4) : 0;
+    m.aura.material.opacity += (auraTgt - m.aura.material.opacity) * Math.min(1, dt*6);
+  }
+
+  /* --- MODO YOLO: auto-yes + fiesta visual --- */
+  if(G.yoloActive > 0 && gameOn){
+    G.yoloActive -= dt;
+    const p = promptingScreens();
+    if(p.length){                     // el mago responde solo, estés donde estés
+      const m = p[0];
+      m.term.state = 'code';
+      G.score += 100;
+      sYes();
+      G.shake = Math.max(G.shake, .06);
+      refreshScrHud();
+    }
+    const hue = (t*.45) % 1;          // arcoíris por todas partes
+    alertLight.color.setHSL(hue, 1, .55);
+    alertLight.intensity = 3 + Math.sin(t*12)*1.5;
+    neonLight.color.setHSL((hue + .33) % 1, 1, .6);
+    wizardGlow.color.setHSL((hue + .66) % 1, 1, .6);
+    wizardGlow.intensity = 3;
+    bloom.strength = .9 + .45*Math.abs(Math.sin(t*6));
+    camera.fov = 48 + Math.sin(t*10)*1.5;
+    camera.updateProjectionMatrix();
+    refreshYoloHud();
+    if(G.yoloActive <= 0) endYolo();
   }
 
   /* --- animación del programador --- */
   const type = gameOn ? 1 : .3;
   if(wizard.mixer){
     wizard.mixer.update(dt);
-    if(wizard.obj) wizard.obj.position.y = .6 + Math.sin(t*1.3)*.03;  // flota, es un sabio
+    if(wizard.obj){
+      wizard.obj.position.y = .62 + Math.sin(t*1.3)*.03;  // flota, es un sabio
+      wizard.obj.rotation.y += ((Math.PI + selX*.18) - wizard.obj.rotation.y) * Math.min(1, dt*5);
+      wizard.obj.position.x += (selX*.15 - wizard.obj.position.x) * Math.min(1, dt*5);
+      // manos sobre la zona del teclado de la pantalla seleccionada
+      const b = wizard.bones, reach = type;
+      if(b.armR){  b.armR.rotation.x  += ARM_TUNE.reachX*reach; b.armR.rotation.z += ARM_TUNE.sideZ*selX*reach; }
+      if(b.foreR){ b.foreR.rotation.x += ARM_TUNE.foreX*reach; }
+      if(b.armL){  b.armL.rotation.x  += ARM_TUNE.reachX*reach; b.armL.rotation.z += ARM_TUNE.sideZ*selX*reach; }
+      if(b.foreL){ b.foreL.rotation.x += ARM_TUNE.foreX*reach; }
+      if(b.spine){ b.spine.rotation.y += ARM_TUNE.spineY*selX*reach; }
+    }
   } else {
     armL.fore.rotation.x = -1.15 + Math.sin(t*10)*.08*type;
     armR.fore.rotation.x = -1.15 + Math.sin(t*10 + 1.6)*.08*type;
+    armL.arm.rotation.z = -.25 - selX*.25;
+    armR.arm.rotation.z =  .25 - selX*.25;
+    dev.rotation.y = -selX*.2;
     torso.scale.y = 1 + Math.sin(t*1.8)*.012;                 // respiración
     headG.position.y = 1.5 + Math.sin(t*1.8)*.008;
     headG.rotation.z = Math.sin(t*.6)*.04;
-    // mira la pantalla que pide atención
-    const p = promptingScreens()[0];
-    const headTargetY = p ? (p.idx - 1) * .45 : Math.sin(t*.4)*.1;
-    const headTargetX = p ? .12 : Math.sin(t*.9)*.05;
+    // mira la pantalla seleccionada
+    const headTargetY = (G.sel - 1) * .45;
+    const headTargetX = .1 + Math.sin(t*.9)*.05;
     headG.rotation.y += (headTargetY - headG.rotation.y) * Math.min(1, dt*5);
     headG.rotation.x += (headTargetX - headG.rotation.x) * Math.min(1, dt*5);
   }
@@ -911,6 +1149,13 @@ addEventListener('resize', ()=>{
   renderer.setSize(innerWidth, innerHeight);
   composer.setSize(innerWidth, innerHeight);
 });
+
+/* --- params de depuración: ?auto arranca solo, ?sel=0/1/2 fuerza pantalla, ?yolo carga la barra --- */
+const qs = new URLSearchParams(location.search);
+if(qs.has('sel')) G.sel = Math.min(2, Math.max(0, parseInt(qs.get('sel')) || 0));
+if(qs.has('yolo')) G.yolo = 1;
+if(qs.has('auto')) setTimeout(()=>{ overlay.style.transition='none'; startGame(); }, 100);
+if(qs.has('bright')) scene.add(new THREE.AmbientLight(0xffffff, 2.5));
 </script>
 </body>
 </html>
