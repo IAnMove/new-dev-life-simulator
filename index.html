@@ -198,6 +198,9 @@ const LANG = {
     musicLabel: '♪ MUSIC',
     creditCorner: 'MADE WITH ☕ BY <b>@TheINAOG</b> ↗',
     creditOverlay: `a game by <a href="https://x.com/TheINAOG" target="_blank" rel="noopener">@TheINAOG</a> — follow me, the AI can't`,
+    charaLabel: 'CHARACTER',
+    charaDev: 'CLASSIC DEV',
+    charaWiz: 'VIBE WIZARD',
     screenNames: ['LEFT', 'CENTER', 'RIGHT'],
     startMsg: 'Shift started. Good luck, "engineer".',
     alert: n => `⚠ ${n} SCREEN NEEDS YOUR APPROVAL!`,
@@ -273,6 +276,9 @@ const LANG = {
     musicLabel: '♪ MÚSICA',
     creditCorner: 'HECHO CON ☕ POR <b>@TheINAOG</b> ↗',
     creditOverlay: `un juego de <a href="https://x.com/TheINAOG" target="_blank" rel="noopener">@TheINAOG</a> — sígueme, la IA no puede`,
+    charaLabel: 'PERSONAJE',
+    charaDev: 'DEV CLÁSICO',
+    charaWiz: 'MAGO VIBECODER',
     screenNames: ['IZQUIERDA', 'CENTRO', 'DERECHA'],
     startMsg: 'Jornada iniciada. Buena suerte, "ingeniero".',
     alert: n => `⚠ ¡PANTALLA ${n} PIDE TU APROBACIÓN!`,
@@ -731,6 +737,7 @@ function makeLeg(side){
 makeLeg(-1); makeLeg(1);
 dev.position.set(0, 0, .95);
 scene.add(dev);
+let devPunch = 0;   // manotazo al teclado al responder
 
 /* ================= EL MAGO VIBECODER (GLB de Meshy) ================= */
 const wizard = { obj:null, mixer:null, actions:{}, bones:{}, current:null, idle:'Sit_Cross_Legged_on_Floor' };
@@ -753,14 +760,21 @@ function playWizard(name, fade=.35, once=false, timeScale=1){
   wizard.current = a;
 }
 
-new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
+let chara = localStorage.getItem('ps2026_char') || 'dev';   // dev | wizard
+let wizardLoading = false;
+function wizardActive(){ return chara === 'wizard' && wizard.obj; }
+
+function loadWizard(){
+  if(wizardLoading || wizard.obj) return;
+  wizardLoading = true;
+  new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
   .load('mago_web.glb', gltf=>{
     const obj = gltf.scene;
     obj.scale.setScalar(.95);
     obj.position.set(0, .62, .97);  // levitando sobre la silla
     obj.rotation.y = Math.PI;       // mirando a los monitores
+    obj.visible = chara === 'wizard';
     scene.add(obj);
-    scene.remove(dev);              // sustituye al muñeco procedural
     wizard.obj = obj;
     obj.traverse(n=>{
       if(!n.isBone) return;
@@ -779,10 +793,23 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
     });
   }, undefined, err => {
     console.warn('GLB no cargado; usando muñeco procedural:', err);
+    if(chara === 'wizard') setChara('dev');   // si falla, vuelve al dev
     showMsg(location.protocol === 'file:'
       ? '⚠ El navegador bloquea mago_web.glb desde file:// — usa un servidor local: python -m http.server 8000'
       : '⚠ No se encontró mago_web.glb — súbelo a la misma carpeta que index.html', 9000);
   });
+}
+dev.visible = chara === 'dev';
+if(chara === 'wizard') loadWizard();
+
+function setChara(c){
+  chara = c;
+  localStorage.setItem('ps2026_char', c);
+  if(c === 'wizard') loadWizard();
+  dev.visible = c === 'dev';
+  if(wizard.obj) wizard.obj.visible = c === 'wizard';
+  if(G.state === 'intro') renderIntro();
+}
 
 /* ================= ESTADO DEL JUEGO ================= */
 const G = {
@@ -822,7 +849,13 @@ function setOverlay(html){
 }
 
 function renderIntro(){
-  setOverlay(S.introHtml + `<p class="langsel">${S.langFooter}</p>`);
+  const on  = 'color:#3aff88;text-shadow:0 0 8px rgba(60,255,140,.8)';
+  const off = 'color:#5a6478';
+  const charaLine = `<p class="langsel">${S.charaLabel}: `
+    + `<span style="${chara==='dev' ? on : off}"><span class="key">3</span> ${S.charaDev}</span>`
+    + ` &nbsp;·&nbsp; `
+    + `<span style="${chara==='wizard' ? on : off}"><span class="key">4</span> ${S.charaWiz}</span></p>`;
+  setOverlay(S.introHtml + charaLine + `<p class="langsel">${S.langFooter}</p>`);
 }
 renderIntro();
 $('vol-label').textContent = S.musicLabel;
@@ -986,16 +1019,19 @@ addEventListener('keydown', e=>{
   if(G.state === 'intro'){
     if(e.code === 'Digit1' || e.code === 'Numpad1'){ setLang('en'); return; }
     if(e.code === 'Digit2' || e.code === 'Numpad2'){ setLang('es'); return; }
+    if(e.code === 'Digit3' || e.code === 'Numpad3'){ setChara('dev'); return; }
+    if(e.code === 'Digit4' || e.code === 'Numpad4'){ setChara('wizard'); return; }
     if(e.code === 'Enter'){ startGame(); return; }
     return;
   }
   if(e.code === 'Enter' || e.code === 'KeyY'){
     if(G.state === 'over' || G.state === 'win'){ location.reload(); return; }
+    devPunch = 1;
     answerYes();
   }
   if(G.state === 'playing'){
     if(e.code === 'Space'){ e.preventDefault(); tryYolo(); }
-    if(e.code === 'KeyN') answerNo();
+    if(e.code === 'KeyN'){ devPunch = 1; answerNo(); }
     if(e.code === 'ArrowLeft'  || e.code === 'KeyA') moveSel(-1);
     if(e.code === 'ArrowRight' || e.code === 'KeyD') moveSel(1);
   }
@@ -1106,7 +1142,7 @@ function animate(){
 
   /* --- animación del programador --- */
   const type = gameOn ? 1 : .3;
-  if(wizard.mixer){
+  if(wizardActive()){
     wizard.mixer.update(dt);
     if(wizard.obj){
       wizard.obj.position.y = .62 + Math.sin(t*1.3)*.03;  // flota, es un sabio
@@ -1121,19 +1157,25 @@ function animate(){
       if(b.spine){ b.spine.rotation.y += ARM_TUNE.spineY*selX*reach; }
     }
   } else {
-    armL.fore.rotation.x = -1.15 + Math.sin(t*10)*.08*type;
-    armR.fore.rotation.x = -1.15 + Math.sin(t*10 + 1.6)*.08*type;
+    devPunch = Math.max(0, devPunch - dt*3.5);            // el manotazo decae
+    const slam = devPunch*devPunch;
+    armL.fore.rotation.x = -1.15 - slam*.45 + Math.sin(t*10)*.08*type;
+    armR.fore.rotation.x = -1.15 - slam*.45 + Math.sin(t*10 + 1.6)*.08*type;
+    armL.arm.rotation.x = -.5 - slam*.3;
+    armR.arm.rotation.x = -.5 - slam*.3;
     armL.arm.rotation.z = -.25 - selX*.25;
     armR.arm.rotation.z =  .25 - selX*.25;
     dev.rotation.y = -selX*.2;
+    dev.rotation.x = slam*.1;                             // se echa hacia adelante al pulsar
     torso.scale.y = 1 + Math.sin(t*1.8)*.012;                 // respiración
-    headG.position.y = 1.5 + Math.sin(t*1.8)*.008;
+    headG.position.y = 1.5 + Math.sin(t*1.8)*.008 - slam*.06;
     headG.rotation.z = Math.sin(t*.6)*.04;
     // mira la pantalla seleccionada
     const headTargetY = (G.sel - 1) * .45;
-    const headTargetX = .1 + Math.sin(t*.9)*.05;
+    const headTargetX = .1 + Math.sin(t*.9)*.05 + slam*.3;
     headG.rotation.y += (headTargetY - headG.rotation.y) * Math.min(1, dt*5);
     headG.rotation.x += (headTargetX - headG.rotation.x) * Math.min(1, dt*5);
+    if(kbLight) kbLight.intensity = .9 + slam*2.5;        // el RGB flashea con el manotazo
   }
 
   // neon parpadeo sutil
