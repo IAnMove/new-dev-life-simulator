@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROGRAMMER SIMULATOR 2026</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#05050a; font-family:'Courier New',monospace; }
+  canvas { display:block; }
+
+  #hud {
+    position:fixed; top:0; left:0; right:0; padding:14px 22px;
+    display:flex; justify-content:space-between; align-items:center;
+    color:#8fffb0; font-size:15px; letter-spacing:2px;
+    text-shadow:0 0 8px rgba(80,255,140,.6);
+    opacity:0; transition:opacity .8s; pointer-events:none; z-index:10;
+  }
+  #hud.on { opacity:1; }
+  #timer { font-size:22px; font-weight:bold; }
+  #timer.low { color:#ff5566; text-shadow:0 0 10px rgba(255,60,80,.8); animation:blink 1s infinite; }
+
+  #screens-hud {
+    position:fixed; bottom:18px; left:22px; display:flex; gap:10px;
+    z-index:10; opacity:0; transition:opacity .8s; pointer-events:none;
+  }
+  #screens-hud.on { opacity:1; }
+  .scr {
+    width:38px; height:24px; border:2px solid #3aff88; border-radius:3px;
+    box-shadow:0 0 10px rgba(60,255,140,.5); transition:all .4s;
+  }
+  .scr.prompt { border-color:#ff4455; box-shadow:0 0 14px rgba(255,60,80,.9); animation:blink .4s infinite; }
+  .scr.dead { border-color:#333; box-shadow:none; opacity:.35; }
+
+  #msg {
+    position:fixed; bottom:60px; left:0; right:0; text-align:center;
+    color:#ffd866; font-size:18px; letter-spacing:2px;
+    text-shadow:0 0 10px rgba(255,200,80,.7);
+    opacity:0; transition:opacity .3s; pointer-events:none; z-index:10;
+  }
+  #msg.on { opacity:1; }
+
+  #vol-hud {
+    position:fixed; bottom:16px; right:22px; z-index:10; pointer-events:none;
+    color:#6a7488; font-size:12px; letter-spacing:2px; text-align:right;
+    text-shadow:0 0 6px rgba(120,140,180,.4); transition:color .3s;
+  }
+  #vol-hud.hot { color:#8fd6ff; }
+  #vol-bar {
+    width:90px; height:5px; margin-top:5px; margin-left:auto;
+    background:#141822; border:1px solid #2a3040; border-radius:3px; overflow:hidden;
+  }
+  #vol-fill {
+    height:100%; width:25%; background:#8fd6ff;
+    box-shadow:0 0 8px rgba(140,220,255,.8); transition:width .15s;
+  }
+
+  #credit {
+    position:fixed; bottom:58px; right:22px; z-index:10;
+    color:#5a6478; font-size:12px; letter-spacing:2px; text-decoration:none;
+    text-shadow:0 0 6px rgba(120,140,180,.4); transition:color .3s;
+  }
+  #credit:hover { color:#8fd6ff; }
+  #credit b { color:#8fd6ff; }
+
+  #overlay {
+    position:fixed; inset:0; display:flex; flex-direction:column;
+    justify-content:center; align-items:center; text-align:center;
+    background:radial-gradient(ellipse at center, rgba(5,5,15,.25) 0%, rgba(3,3,8,.92) 100%);
+    z-index:20; transition:opacity 1s; padding:20px;
+  }
+  #overlay.hidden { opacity:0; pointer-events:none; }
+  #overlay h1 {
+    color:#e8f6ff; font-size:clamp(28px,6vw,64px); letter-spacing:10px; font-weight:bold;
+    text-shadow:0 0 20px rgba(90,200,255,.9), 0 0 60px rgba(90,200,255,.4);
+    animation:flicker 3s infinite;
+  }
+  #overlay h1 span { color:#3aff88; text-shadow:0 0 20px rgba(60,255,140,.9); }
+  #overlay h2 { color:#ff5566; font-size:clamp(20px,4vw,40px); letter-spacing:6px; text-shadow:0 0 18px rgba(255,60,80,.8); margin-bottom:12px; }
+  #overlay p { color:#9aa4b8; font-size:clamp(13px,2vw,17px); letter-spacing:2px; margin-top:18px; line-height:1.9; max-width:640px; }
+  #overlay .key {
+    display:inline-block; border:1px solid #3aff88; color:#3aff88; padding:2px 10px;
+    border-radius:4px; margin:0 4px; box-shadow:0 0 8px rgba(60,255,140,.4);
+  }
+  #overlay .pulse { animation:pulse 1.2s infinite; margin-top:30px; color:#3aff88; font-size:clamp(14px,2.4vw,20px); letter-spacing:4px; }
+  #overlay .langsel { margin-top:26px; font-size:clamp(12px,1.8vw,15px); color:#5a6478; }
+  #overlay .credit-line { margin-top:22px; font-size:clamp(11px,1.6vw,14px); color:#5a6478; }
+  #overlay a { color:#8fd6ff; text-decoration:none; }
+  #overlay a:hover { text-shadow:0 0 10px rgba(140,220,255,.9); }
+
+  #scanlines {
+    position:fixed; inset:0; pointer-events:none; z-index:15; opacity:.10;
+    background:repeating-linear-gradient(0deg, transparent 0 2px, #000 2px 4px);
+  }
+  #vignette {
+    position:fixed; inset:0; pointer-events:none; z-index:14;
+    background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%);
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+  @keyframes pulse { 0%,100%{opacity:1; transform:scale(1)} 50%{opacity:.6; transform:scale(.97)} }
+  @keyframes flicker { 0%,93%,95%,100%{opacity:1} 94%{opacity:.6} 97%{opacity:.8} }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <span id="timer">05:00</span>
+  <span>PROGRAMMER SIMULATOR 2026</span>
+  <span id="score">LINES: 0</span>
+</div>
+<div id="screens-hud">
+  <div class="scr" id="scr0"></div>
+  <div class="scr" id="scr1"></div>
+  <div class="scr" id="scr2"></div>
+</div>
+<div id="msg"></div>
+<div id="vol-hud">
+  <span id="vol-label">♪ MUSIC</span> [ + / - ]
+  <div id="vol-bar"><div id="vol-fill"></div></div>
+</div>
+<a id="credit" href="https://x.com/TheINAOG" target="_blank" rel="noopener"></a>
+<div id="scanlines"></div>
+<div id="vignette"></div>
+<div id="overlay"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+/* ================= IDIOMAS ================= */
+const LANG = {
+  en: {
+    linesHud: 'LINES: ',
+    musicLabel: '♪ MUSIC',
+    creditCorner: 'MADE WITH ☕ BY <b>@TheINAOG</b> ↗',
+    creditOverlay: `a game by <a href="https://x.com/TheINAOG" target="_blank" rel="noopener">@TheINAOG</a> — follow me, the AI can't`,
+    screenNames: ['LEFT', 'CENTER', 'RIGHT'],
+    startMsg: 'Shift started. Good luck, "engineer".',
+    alert: n => `⚠ ${n} SCREEN NEEDS YOUR APPROVAL!`,
+    noMsg: 'You said NO. That screen has been fired.',
+    timeoutMsg: 'Too slow. The AI went out for coffee.',
+    promptTitle: '⚠ CONTINUE? [Y/N]',
+    promptHelp: 'ENTER = yes      N = no',
+    noSignal: 'NO SIGNAL',
+    langFooter: 'LANGUAGE: <span class="key">1</span> ENGLISH &nbsp;·&nbsp; <span class="key">2</span> ESPAÑOL &nbsp;·&nbsp; ♪ VOL <span class="key">+</span><span class="key">-</span>',
+    introHtml: `
+      <h1>PROGRAMMER<br>SIMULATOR <span>2026</span></h1>
+      <p>The AI writes the code. You have the most important job:<br>
+      press <span class="key">ENTER</span> when the system asks <b>CONTINUE? [Y/N]</b>.</p>
+      <p>Press <span class="key">N</span> or run out of time and that screen dies.<br>
+      Lose all 3 screens and you'll be replaced. Survive 5 minutes.</p>
+      <p class="pulse">[ PRESS ENTER TO CLOCK IN ]</p>`,
+    overHtml: (score, time) => `
+      <h2>ALL 3 SCREENS ARE DEAD</h2>
+      <p>The AI has decided you're redundant.<br>
+      Your position will be filled by a 12-line script.</p>
+      <p>LINES WRITTEN: <b style="color:#3aff88">${score}</b> &nbsp;|&nbsp;
+      TIME SURVIVED: <b style="color:#3aff88">${time}</b></p>
+      <p class="pulse">[ PRESS ENTER TO BE REHIRED AS AN INTERN ]</p>`,
+    winHtml: (score, alive) => `
+      <h1>SHIFT<br><span>COMPLETE!</span></h1>
+      <p>You survived 5 minutes as a programmer in 2026.<br>
+      You pressed ENTER like a true senior professional.</p>
+      <p>LINES WRITTEN: <b style="color:#3aff88">${score}</b> &nbsp;|&nbsp;
+      SCREENS ALIVE: <b style="color:#3aff88">${alive}/3</b></p>
+      <p>Same again tomorrow. And the day after. And the day after.</p>
+      <p class="pulse">[ PRESS ENTER TO CLOCK IN AGAIN ]</p>`,
+    codeLines: [
+      "$ npm install   (48,312 packages...)",
+      "gpt-9: generating Login.tsx...",
+      "✔ 847 tests OK (3 skipped, whatever)",
+      "$ git commit -m 'final fix FINAL v2'",
+      "warning: this code is 94% AI",
+      "deploying to production... on a Friday",
+      "copilot just wrote your will",
+      "meeting that could've been an email in 5 min",
+      "$ rm -rf node_modules && cry",
+      "error: works on my machine",
+      "claude: are you sure about that CSS?",
+      "rust > everything (source: reddit)",
+      "TODO: fix this before 2027",
+      "compiling... go grab a coffee ☕",
+      "$ sudo make-me-a-sandwich",
+      "daily standup lasted 2 hours again",
+      "stack overflow: answer from 2011",
+      "HR asks if you're a 'prompt engineer'",
+      "you are the legacy code",
+      "merge conflict in your personal life",
+      "$ docker up your-career",
+      "the AI is asking for a raise",
+    ],
+    yesMsgs: [
+      "Keep pretending you understand the code.",
+      "The AI approves your decision. For now.",
+      "+50 lines nobody will ever read.",
+      "ENTER: the most in-demand skill of 2026.",
+      "You accepted without reading, like a real dev.",
+    ],
+  },
+  es: {
+    linesHud: 'LÍNEAS: ',
+    musicLabel: '♪ MÚSICA',
+    creditCorner: 'HECHO CON ☕ POR <b>@TheINAOG</b> ↗',
+    creditOverlay: `un juego de <a href="https://x.com/TheINAOG" target="_blank" rel="noopener">@TheINAOG</a> — sígueme, la IA no puede`,
+    screenNames: ['IZQUIERDA', 'CENTRO', 'DERECHA'],
+    startMsg: 'Jornada iniciada. Buena suerte, "ingeniero".',
+    alert: n => `⚠ ¡PANTALLA ${n} PIDE TU APROBACIÓN!`,
+    noMsg: 'Dijiste que NO. Esa pantalla ha sido despedida.',
+    timeoutMsg: 'Se te pasó el arroz. La IA se fue a por café.',
+    promptTitle: '⚠ ¿CONTINUAR? [Y/N]',
+    promptHelp: 'ENTER = sí      N = no',
+    noSignal: 'SIN SEÑAL',
+    langFooter: 'IDIOMA: <span class="key">1</span> ENGLISH &nbsp;·&nbsp; <span class="key">2</span> ESPAÑOL &nbsp;·&nbsp; ♪ VOL <span class="key">+</span><span class="key">-</span>',
+    introHtml: `
+      <h1>PROGRAMMER<br>SIMULATOR <span>2026</span></h1>
+      <p>La IA escribe el código. Tú tienes el trabajo más importante:<br>
+      pulsar <span class="key">ENTER</span> cuando el sistema pregunte <b>¿CONTINUAR? [Y/N]</b>.</p>
+      <p>Si pulsas <span class="key">N</span> o se acaba el tiempo, esa pantalla muere.<br>
+      Pierde las 3 pantallas y serás reemplazado. Sobrevive 5 minutos.</p>
+      <p class="pulse">[ PULSA ENTER PARA FICHAR ]</p>`,
+    overHtml: (score, time) => `
+      <h2>LAS 3 PANTALLAS HAN MUERTO</h2>
+      <p>La IA ha decidido que eres redundante.<br>
+      Tu puesto será ocupado por un script de 12 líneas.</p>
+      <p>LÍNEAS ESCRITAS: <b style="color:#3aff88">${score}</b> &nbsp;|&nbsp;
+      TIEMPO AGUANTADO: <b style="color:#3aff88">${time}</b></p>
+      <p class="pulse">[ PULSA ENTER PARA SER RECONTRATADO COMO BECARIO ]</p>`,
+    winHtml: (score, alive) => `
+      <h1>¡JORNADA<br><span>COMPLETADA!</span></h1>
+      <p>Has sobrevivido 5 minutos como programador en 2026.<br>
+      Pulsaste ENTER como un auténtico profesional senior.</p>
+      <p>LÍNEAS ESCRITAS: <b style="color:#3aff88">${score}</b> &nbsp;|&nbsp;
+      PANTALLAS VIVAS: <b style="color:#3aff88">${alive}/3</b></p>
+      <p>Mañana lo mismo. Y pasado. Y pasado.</p>
+      <p class="pulse">[ PULSA ENTER PARA FICHAR OTRA VEZ ]</p>`,
+    codeLines: [
+      "$ npm install   (48.312 paquetes...)",
+      "gpt-9: generando Login.tsx...",
+      "✔ 847 tests OK (3 ignorados, no pasa na)",
+      "$ git commit -m 'fix definitivo FINAL v2'",
+      "warning: este código es 94% IA",
+      "deployando a producción... un viernes",
+      "copilot ha escrito tu testamento",
+      "reunión que pudo ser email en 5 min",
+      "$ rm -rf node_modules && llorar",
+      "error: funciona en mi máquina",
+      "claude: ¿seguro que quieres CSS así?",
+      "rust > todo (fuente: reddit)",
+      "TODO: arreglar esto antes de 2027",
+      "compilando... ve a por café ☕",
+      "$ sudo hazme-un-sandwich",
+      "la daily ha durado 2 horas otra vez",
+      "stack overflow: respuesta de 2011",
+      "HR pregunta si eres 'prompt engineer'",
+      "tu código legacy eres tú",
+      "merge conflict en la vida personal",
+      "$ docker up tu-carrera",
+      "la IA pide aumento de sueldo",
+    ],
+    yesMsgs: [
+      "Sigues fingiendo que entiendes el código.",
+      "La IA aprueba tu decisión. Por ahora.",
+      "+50 líneas que nadie leerá jamás.",
+      "ENTER: la skill más demandada de 2026.",
+      "Has aceptado sin leer, como todo dev.",
+    ],
+  },
+};
+let S = LANG.en;   // inglés por defecto
+function setLang(l){
+  S = LANG[l];
+  $('vol-label').textContent = S.musicLabel;
+  $('credit').innerHTML = S.creditCorner;
+  renderIntro();
+}
+
+/* ================= AUDIO (WebAudio, sin assets) ================= */
+let actx = null;
+function AC(){ if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); return actx; }
+function tone(freq, dur, type='square', vol=0.12, delay=0, slideTo=null){
+  try{
+    const a=AC(), o=a.createOscillator(), g=a.createGain();
+    o.type=type; o.frequency.setValueAtTime(freq, a.currentTime+delay);
+    if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, a.currentTime+delay+dur);
+    g.gain.setValueAtTime(vol, a.currentTime+delay);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime+delay+dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(a.currentTime+delay); o.stop(a.currentTime+delay+dur+.02);
+  }catch(e){}
+}
+const sClack  = () => tone(1400+Math.random()*600, .03, 'square', .05);
+const sAlarm  = () => { tone(880,.12,'square',.10); tone(880,.12,'square',.10,.18); tone(660,.2,'square',.10,.38); };
+const sYes    = () => { tone(523,.08,'sine',.12); tone(784,.12,'sine',.12,.09); };
+const sDead   = () => tone(400,.7,'sawtooth',.14,0,60);
+const sStart  = () => { tone(60,.5,'sine',.3,0,45); tone(1200,.15,'square',.06,.1,300); };
+const sWin    = () => [523,659,784,1046].forEach((f,i)=>tone(f,.25,'triangle',.14,i*.14));
+const sLose   = () => [400,300,220,140].forEach((f,i)=>tone(f,.35,'sawtooth',.12,i*.22));
+
+/* ================= MÚSICA DE FONDO ================= */
+const bgm = new Audio('vibemusic_web.mp3');
+bgm.loop = true;
+bgm.volume = parseFloat(localStorage.getItem('ps2026_vol') ?? '0.25');
+let volHotTimer = null;
+function setVol(v){
+  bgm.volume = Math.min(1, Math.max(0, v));
+  localStorage.setItem('ps2026_vol', bgm.volume.toFixed(2));
+  $('vol-fill').style.width = (bgm.volume*100) + '%';
+  const hud = $('vol-hud');
+  hud.classList.add('hot');
+  clearTimeout(volHotTimer);
+  volHotTimer = setTimeout(()=>hud.classList.remove('hot'), 1200);
+}
+
+/* ================= RENDERER / ESCENA ================= */
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05050a);
+scene.fog = new THREE.Fog(0x05050a, 9, 32);
+
+const camera = new THREE.PerspectiveCamera(48, innerWidth/innerHeight, .1, 100);
+const CAM_START = new THREE.Vector3(0, 10, 18);
+const CAM_BASE  = new THREE.Vector3(0.55, 2.05, 3.35);
+const CAM_LOOK  = new THREE.Vector3(0, 1.35, -1.0);
+camera.position.copy(CAM_START);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.55, 0.32);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+/* ================= LUCES ================= */
+scene.add(new THREE.AmbientLight(0x334, 1.2));
+const moon = new THREE.DirectionalLight(0x6688cc, 0.5);
+moon.position.set(4, 8, 6);
+scene.add(moon);
+const deskSpot = new THREE.SpotLight(0xffeedd, 12, 12, .6, .5, 1.6);
+deskSpot.position.set(0, 4.2, 1.2);
+deskSpot.target.position.set(0, 1, -0.4);
+scene.add(deskSpot, deskSpot.target);
+const alertLight = new THREE.PointLight(0xff2233, 0, 9);
+alertLight.position.set(0, 2.6, 0.6);
+scene.add(alertLight);
+
+/* ================= MATERIALES ================= */
+const M = {
+  desk:  new THREE.MeshStandardMaterial({ color:0x16161f, roughness:.6, metalness:.3 }),
+  dark:  new THREE.MeshStandardMaterial({ color:0x0d0d14, roughness:.8 }),
+  frame: new THREE.MeshStandardMaterial({ color:0x0a0a10, roughness:.4, metalness:.6 }),
+  chair: new THREE.MeshStandardMaterial({ color:0x11111a, roughness:.7 }),
+  skin:  new THREE.MeshStandardMaterial({ color:0xd9a07a, roughness:.8 }),
+  hoodie:new THREE.MeshStandardMaterial({ color:0x2a2a3d, roughness:.9 }),
+  jeans: new THREE.MeshStandardMaterial({ color:0x1b2436, roughness:.9 }),
+  hair:  new THREE.MeshStandardMaterial({ color:0x241a12, roughness:1 }),
+  mug:   new THREE.MeshStandardMaterial({ color:0x33ff88, roughness:.5 }),
+};
+const glow = (color, intensity=1) => new THREE.MeshBasicMaterial({ color:new THREE.Color(color).multiplyScalar(intensity) });
+
+/* ================= HABITACIÓN ================= */
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50),
+  new THREE.MeshStandardMaterial({ color:0x0a0a12, roughness:.85, metalness:.15 }));
+floor.rotation.x = -Math.PI/2;
+scene.add(floor);
+const grid = new THREE.GridHelper(50, 50, 0x1c1c30, 0x121220);
+grid.position.y = .01;
+scene.add(grid);
+
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(50, 12),
+  new THREE.MeshStandardMaterial({ color:0x0b0b14, roughness:.95 }));
+wall.position.set(0, 6, -3.4);
+scene.add(wall);
+
+// tira neon tras la mesa
+const neon = new THREE.Mesh(new THREE.BoxGeometry(4.4, .045, .045), glow(0xff2fd6, 2.2));
+neon.position.set(0, 1.9, -3.35);
+scene.add(neon);
+const neon2 = new THREE.Mesh(new THREE.BoxGeometry(.045, 1.6, .045), glow(0x2fd6ff, 2.2));
+neon2.position.set(-2.4, 1.1, -3.35);
+scene.add(neon2);
+const neonLight = new THREE.PointLight(0xff2fd6, 3, 7);
+neonLight.position.set(0, 2, -2.8);
+scene.add(neonLight);
+
+/* ================= MESA ================= */
+const desk = new THREE.Group();
+const top = new THREE.Mesh(new THREE.BoxGeometry(3.8, .09, 1.35), M.desk);
+top.position.y = 1.0;
+desk.add(top);
+[[-1.75,-.55],[1.75,-.55],[-1.75,.55],[1.75,.55]].forEach(([x,z])=>{
+  const leg = new THREE.Mesh(new THREE.BoxGeometry(.07, 1, .07), M.frame);
+  leg.position.set(x, .5, z);
+  desk.add(leg);
+});
+desk.position.z = -0.55;
+scene.add(desk);
+
+/* ================= TERMINALES ================= */
+class Terminal {
+  constructor(){
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = 512; this.canvas.height = 300;
+    this.ctx = this.canvas.getContext('2d');
+    this.tex = new THREE.CanvasTexture(this.canvas);
+    this.tex.colorSpace = THREE.SRGBColorSpace;
+    this.lines = [];
+    this.lineTimer = 0;
+    this.state = 'code';          // code | prompt | dead
+    this.promptTime = 0;
+    this.promptMax = 1;
+    for(let i=0;i<12;i++) this.addLine();
+  }
+  addLine(){
+    this.lines.push(S.codeLines[(Math.random()*S.codeLines.length)|0]);
+    if(this.lines.length > 14) this.lines.shift();
+  }
+  tick(dt, t, gameOn){
+    if(this.state === 'code' && gameOn){
+      this.lineTimer -= dt;
+      if(this.lineTimer <= 0){
+        this.addLine();
+        G.score += 3;
+        this.lineTimer = .25 + Math.random()*.6;
+      }
+    }
+    this.draw(t);
+    this.tex.needsUpdate = true;
+  }
+  draw(t){
+    const c = this.ctx;
+    if(this.state === 'dead'){
+      c.fillStyle = '#010102';
+      c.fillRect(0,0,512,300);
+      if(Math.sin(t*1.5) > .8){
+        c.fillStyle = '#1a1a22';
+        c.font = '14px monospace';
+        c.textAlign = 'center';
+        c.fillText(S.noSignal, 256, 150);
+        c.textAlign = 'left';
+      }
+      return;
+    }
+    const prompting = this.state === 'prompt';
+    c.fillStyle = prompting ? '#1a0505' : '#020a06';
+    c.fillRect(0,0,512,300);
+    c.font = '15px monospace';
+    this.lines.forEach((ln, i) => {
+      c.fillStyle = prompting ? '#774444' : (i === this.lines.length-1 ? '#aaffcc' : '#2fd47a');
+      c.fillText(ln, 14, 26 + i*19);
+    });
+    // cursor
+    if(!prompting && Math.sin(t*5) > 0){
+      c.fillStyle = '#aaffcc';
+      c.fillRect(14 + c.measureText(this.lines[this.lines.length-1]).width + 4, 26 + (this.lines.length-1)*19 - 13, 9, 15);
+    }
+    if(prompting){
+      const blink = Math.sin(t*8) > 0;
+      c.fillStyle = 'rgba(60,0,0,.88)';
+      c.fillRect(46, 78, 420, 144);
+      c.strokeStyle = blink ? '#ff3344' : '#882222';
+      c.lineWidth = 4;
+      c.strokeRect(46, 78, 420, 144);
+      c.fillStyle = blink ? '#ffee00' : '#ff3344';
+      c.font = 'bold 30px monospace';
+      c.textAlign = 'center';
+      c.fillText(S.promptTitle, 256, 128);
+      c.font = '17px monospace';
+      c.fillStyle = '#ff8899';
+      c.fillText(S.promptHelp, 256, 162);
+      // barra de tiempo
+      const p = Math.max(0, this.promptTime / this.promptMax);
+      c.fillStyle = '#440000';
+      c.fillRect(76, 186, 360, 14);
+      c.fillStyle = p > .35 ? '#ffcc33' : '#ff3344';
+      c.fillRect(76, 186, 360*p, 14);
+      c.textAlign = 'left';
+    }
+  }
+}
+
+/* ================= MONITORES ================= */
+const monitors = [];
+function makeMonitor(x, z, ry, idx){
+  const g = new THREE.Group();
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.5, .9, .06), M.frame);
+  g.add(frame);
+  const term = new Terminal();
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.4, .82),
+    new THREE.MeshBasicMaterial({ map: term.tex }));
+  screen.position.z = .035;
+  g.add(screen);
+  const neck = new THREE.Mesh(new THREE.BoxGeometry(.08, .35, .06), M.frame);
+  neck.position.y = -.6;
+  g.add(neck);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(.5, .04, .32), M.frame);
+  base.position.y = -.78;
+  g.add(base);
+  g.position.set(x, 1.62, z);
+  g.rotation.y = ry;
+  scene.add(g);
+  const light = new THREE.PointLight(0x33ff88, .8, 3.2, 1.8);
+  light.position.set(x*1.05, 1.6, z + .55);
+  scene.add(light);
+  monitors.push({ group:g, term, light, idx });
+}
+makeMonitor(-1.18, -0.72,  .42, 0);
+makeMonitor( 0,    -0.95,  0,   1);
+makeMonitor( 1.18, -0.72, -.42, 2);
+
+/* ================= TECLADO RGB ================= */
+(function makeKeyboard(){
+  const kc = document.createElement('canvas');
+  kc.width = 256; kc.height = 80;
+  const kx = kc.getContext('2d');
+  kx.fillStyle = '#0a0a12'; kx.fillRect(0,0,256,80);
+  const hues = [0,60,120,180,240,300];
+  for(let r=0;r<4;r++) for(let i=0;i<13;i++){
+    kx.fillStyle = `hsl(${(hues[(i+r)%6]+r*20)%360},90%,55%)`;
+    kx.fillRect(6+i*19, 6+r*18, 15, 13);
+  }
+  const ktex = new THREE.CanvasTexture(kc);
+  ktex.colorSpace = THREE.SRGBColorSpace;
+  const kb = new THREE.Mesh(new THREE.BoxGeometry(.95, .035, .3),
+    new THREE.MeshBasicMaterial({ map:ktex }));
+  kb.position.set(0, 1.07, 0.12);
+  scene.add(kb);
+  const klight = new THREE.PointLight(0x8833ff, .9, 1.4);
+  klight.position.set(0, 1.25, 0.12);
+  scene.add(klight);
+})();
+
+/* ================= TAZA ================= */
+(function makeMug(){
+  const mug = new THREE.Mesh(new THREE.CylinderGeometry(.055,.045,.11,16), M.mug);
+  mug.position.set(.68, 1.1, 0);
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(.035,.01,8,16), M.mug);
+  handle.position.set(.75, 1.1, 0);
+  scene.add(mug, handle);
+})();
+
+/* ================= SILLA ================= */
+(function makeChair(){
+  const g = new THREE.Group();
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(.55,.07,.5), M.chair);
+  seat.position.y = .56;
+  const back = new THREE.Mesh(new THREE.BoxGeometry(.5,.62,.06), M.chair);
+  back.position.set(0, .95, .26);
+  back.rotation.x = -.12;
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,.5), M.frame);
+  pole.position.y = .3;
+  g.add(seat, back, pole);
+  for(let i=0;i<5;i++){
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(.3,.03,.05), M.frame);
+    leg.position.y = .05;
+    leg.rotation.y = i/5*Math.PI*2;
+    leg.translateX(.14);
+    g.add(leg);
+  }
+  g.position.set(0, 0, .95);
+  scene.add(g);
+})();
+
+/* ================= EL PROGRAMADOR (fallback procedural) ================= */
+const dev = new THREE.Group();
+const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.21, .42, 6, 12), M.hoodie);
+torso.position.y = 1.02;
+dev.add(torso);
+
+const headG = new THREE.Group();
+headG.position.y = 1.5;
+const head = new THREE.Mesh(new THREE.SphereGeometry(.155, 20, 16), M.skin);
+const hair = new THREE.Mesh(new THREE.SphereGeometry(.16, 20, 16, 0, Math.PI*2, 0, Math.PI*.55), M.hair);
+hair.position.y = .015;
+hair.rotation.x = -.35;
+// auriculares
+const band = new THREE.Mesh(new THREE.TorusGeometry(.17, .018, 8, 20, Math.PI), M.dark);
+band.position.y = .03;
+const cupL = new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,.045,12), M.dark);
+cupL.rotation.z = Math.PI/2; cupL.position.set(-.16, -.01, 0);
+const cupR = cupL.clone(); cupR.position.x = .16;
+headG.add(head, hair, band, cupL, cupR);
+dev.add(headG);
+
+function makeArm(side){ // side: -1 izq, 1 dcha
+  const arm = new THREE.Group();
+  arm.position.set(.24*side, 1.28, 0);
+  const upper = new THREE.Mesh(new THREE.CapsuleGeometry(.055, .3, 4, 8), M.hoodie);
+  upper.position.y = -.16;
+  arm.add(upper);
+  const fore = new THREE.Group();
+  fore.position.y = -.34;
+  const fm = new THREE.Mesh(new THREE.CapsuleGeometry(.045, .28, 4, 8), M.skin);
+  fm.position.y = -.15;
+  fore.add(fm);
+  arm.add(fore);
+  arm.rotation.x = -.5;
+  arm.rotation.z = .25*side;
+  fore.rotation.x = -1.15;
+  dev.add(arm);
+  return { arm, fore };
+}
+const armL = makeArm(-1), armR = makeArm(1);
+
+function makeLeg(side){
+  const leg = new THREE.Group();
+  leg.position.set(.13*side, .72, .05);
+  const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(.075, .32, 4, 8), M.jeans);
+  thigh.rotation.x = Math.PI/2 - .15;
+  thigh.position.z = -.18;
+  leg.add(thigh);
+  const shin = new THREE.Mesh(new THREE.CapsuleGeometry(.06, .34, 4, 8), M.jeans);
+  shin.position.set(0, -.28, -.42);
+  leg.add(shin);
+  dev.add(leg);
+}
+makeLeg(-1); makeLeg(1);
+dev.position.set(0, 0, .95);
+scene.add(dev);
+
+/* ================= EL MAGO VIBECODER (GLB de Meshy) ================= */
+const wizard = { obj:null, mixer:null, actions:{}, current:null, idle:'Sit_Cross_Legged_on_Floor' };
+
+function playWizard(name, fade=.35, once=false, timeScale=1){
+  if(!wizard.mixer) return;
+  const a = wizard.actions[name];
+  if(!a) return;
+  a.reset();
+  a.timeScale = timeScale;
+  if(once){ a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+  else a.setLoop(THREE.LoopRepeat, Infinity);
+  if(wizard.current && wizard.current !== a){
+    wizard.current.fadeOut(fade);
+    a.fadeIn(fade);
+  }
+  a.play();
+  wizard.current = a;
+}
+
+new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
+  .load('mago_web.glb', gltf=>{
+    const obj = gltf.scene;
+    obj.scale.setScalar(.95);
+    obj.position.set(0, .6, .85);   // levitando sobre la silla
+    obj.rotation.y = Math.PI;       // mirando a los monitores
+    scene.add(obj);
+    scene.remove(dev);              // sustituye al muñeco procedural
+    wizard.obj = obj;
+    wizard.mixer = new THREE.AnimationMixer(obj);
+    for(const clip of gltf.animations) wizard.actions[clip.name] = wizard.mixer.clipAction(clip);
+    playWizard(wizard.idle);
+    wizard.mixer.addEventListener('finished', ()=>{
+      if(G.state === 'playing') playWizard(wizard.idle, .4);
+    });
+  }, undefined, err => console.warn('GLB no cargado; usando muñeco procedural:', err));
+
+/* ================= ESTADO DEL JUEGO ================= */
+const G = {
+  state: 'intro',       // intro | playing | over | win
+  duration: 300,
+  timeLeft: 300,
+  score: 0,
+  nextPrompt: 7,
+  introT: 0,
+  shake: 0,
+  punch: 0,
+};
+const mouse = { x:0, y:0 };
+addEventListener('mousemove', e=>{
+  mouse.x = (e.clientX/innerWidth - .5);
+  mouse.y = (e.clientY/innerHeight - .5);
+});
+
+const $ = id => document.getElementById(id);
+const overlay = $('overlay');
+let msgTimer = null;
+function showMsg(text, dur=2400){
+  const m = $('msg');
+  m.textContent = text;
+  m.classList.add('on');
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(()=>m.classList.remove('on'), dur);
+}
+function setOverlay(html){
+  overlay.innerHTML = html + `<p class="credit-line">${S.creditOverlay}</p>`;
+  overlay.classList.remove('hidden');
+}
+
+function renderIntro(){
+  setOverlay(S.introHtml + `<p class="langsel">${S.langFooter}</p>`);
+}
+renderIntro();
+$('vol-label').textContent = S.musicLabel;
+$('credit').innerHTML = S.creditCorner;
+setVol(bgm.volume);   // pinta la barra inicial
+
+function startGame(){
+  AC().resume && AC().resume();
+  G.state = 'playing';
+  G.punch = 1;
+  sStart();
+  bgm.play().catch(()=>{});
+  overlay.classList.add('hidden');
+  $('hud').classList.add('on');
+  $('screens-hud').classList.add('on');
+  showMsg(S.startMsg, 3000);
+}
+
+function aliveScreens(){ return monitors.filter(m => m.term.state !== 'dead'); }
+function promptingScreens(){ return monitors.filter(m => m.term.state === 'prompt'); }
+
+function tryPrompt(){
+  const cand = aliveScreens().filter(m => m.term.state === 'code');
+  if(!cand.length){ G.nextPrompt = 1; return; }
+  const m = cand[(Math.random()*cand.length)|0];
+  const prog = 1 - G.timeLeft/G.duration;
+  m.term.state = 'prompt';
+  m.term.promptMax = m.term.promptTime = THREE.MathUtils.lerp(15, 7, prog);
+  sAlarm();
+  G.shake = Math.max(G.shake, .12);
+  showMsg(S.alert(S.screenNames[m.idx]), 2000);
+  $('scr'+m.idx).classList.add('prompt');
+}
+
+function killScreen(m, reason){
+  m.term.state = 'dead';
+  sDead();
+  G.shake = Math.max(G.shake, .3);
+  playWizard('Sit_Finger_Wag_No', .25, true);   // el mago lamenta la pérdida
+  $('scr'+m.idx).classList.remove('prompt');
+  $('scr'+m.idx).classList.add('dead');
+  showMsg(reason, 2800);
+  if(!aliveScreens().length) gameOver();
+}
+
+function answerYes(){
+  sClack();
+  const p = promptingScreens();
+  if(!p.length){ G.score += 5; return; }
+  const m = p[0];
+  m.term.state = 'code';
+  $('scr'+m.idx).classList.remove('prompt');
+  G.score += 50;
+  sYes();
+  playWizard('Sit_Cheer_with_Left_Hand', .25, true);   // celebra sin levantarse
+  showMsg(S.yesMsgs[(Math.random()*S.yesMsgs.length)|0]);
+}
+
+function answerNo(){
+  const p = promptingScreens();
+  if(!p.length) return;
+  killScreen(p[0], S.noMsg);
+}
+
+function gameOver(){
+  G.state = 'over';
+  sLose();
+  alertLight.intensity = 4;
+  playWizard(wizard.idle, .6, false, .25);   // se hunde en cámara lenta
+  setOverlay(S.overHtml(G.score, fmtTime(G.duration - G.timeLeft)));
+}
+function gameWin(){
+  G.state = 'win';
+  sWin();
+  playWizard('Sit_Cheer_with_Left_Hand', .4);   // celebración en bucle
+  setOverlay(S.winHtml(G.score, aliveScreens().length));
+}
+
+function fmtTime(s){
+  s = Math.max(0, Math.ceil(s));
+  return String((s/60)|0).padStart(2,'0') + ':' + String(s%60|0).padStart(2,'0');
+}
+
+addEventListener('keydown', e=>{
+  if(e.repeat) return;
+  // volumen de la música (en cualquier momento)
+  if(e.code === 'Equal' || e.code === 'NumpadAdd'){ setVol(bgm.volume + .1); return; }
+  if(e.code === 'Minus' || e.code === 'NumpadSubtract'){ setVol(bgm.volume - .1); return; }
+  if(G.state === 'intro'){
+    if(e.code === 'Digit1' || e.code === 'Numpad1'){ setLang('en'); return; }
+    if(e.code === 'Digit2' || e.code === 'Numpad2'){ setLang('es'); return; }
+    if(e.code === 'Enter'){ startGame(); return; }
+    return;
+  }
+  if(e.code === 'Enter'){
+    if(G.state === 'over' || G.state === 'win'){ location.reload(); return; }
+    answerYes();
+  }
+  if(e.code === 'KeyN' && G.state === 'playing') answerNo();
+});
+
+/* ================= BUCLE ================= */
+const clock = new THREE.Clock();
+let lastSec = -1;
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), .05);
+  const t = clock.elapsedTime;
+
+  /* --- cámara --- */
+  if(G.state === 'intro'){
+    G.introT = Math.min(1, G.introT + dt/5);
+    const k = G.introT*G.introT*(3-2*G.introT); // smoothstep
+    camera.position.lerpVectors(CAM_START, CAM_BASE, k);
+    camera.position.y += Math.sin(t*.8)*.15*(1-k);
+    camera.lookAt(CAM_LOOK);
+  } else {
+    const sway = .04;
+    camera.position.x = CAM_BASE.x + Math.sin(t*.5)*sway + mouse.x*.35;
+    camera.position.y = CAM_BASE.y + Math.sin(t*.7)*sway*.6 - mouse.y*.2;
+    camera.position.z = CAM_BASE.z - G.punch*.55;
+    G.punch = Math.max(0, G.punch - dt*2.2);
+    if(G.shake > 0){
+      camera.position.x += (Math.random()-.5)*G.shake;
+      camera.position.y += (Math.random()-.5)*G.shake;
+      G.shake = Math.max(0, G.shake - dt*.8);
+    }
+    camera.lookAt(CAM_LOOK);
+  }
+
+  /* --- juego --- */
+  const gameOn = G.state === 'playing';
+  if(gameOn){
+    G.timeLeft -= dt;
+    const prog = 1 - G.timeLeft/G.duration;
+    G.nextPrompt -= dt;
+    if(G.nextPrompt <= 0){
+      tryPrompt();
+      G.nextPrompt = THREE.MathUtils.lerp(8, 3, prog) * (.7 + Math.random()*.6);
+    }
+    for(const m of monitors){
+      if(m.term.state === 'prompt'){
+        m.term.promptTime -= dt;
+        if(m.term.promptTime <= 0)
+          killScreen(m, S.timeoutMsg);
+      }
+    }
+    if(G.timeLeft <= 0 && G.state === 'playing') gameWin();
+    const sec = Math.ceil(G.timeLeft);
+    if(sec !== lastSec){
+      lastSec = sec;
+      $('timer').textContent = fmtTime(G.timeLeft);
+      $('timer').classList.toggle('low', G.timeLeft < 30);
+      $('score').textContent = S.linesHud + G.score;
+    }
+  }
+
+  /* --- terminales y luces de pantalla --- */
+  const anyPrompt = promptingScreens().length > 0;
+  alertLight.intensity = THREE.MathUtils.lerp(
+    G.state === 'over' ? 4 : (anyPrompt ? 2.5 + Math.sin(t*10)*1.2 : 0),
+    alertLight.intensity, .85);
+  alertLight.intensity = anyPrompt || G.state==='over' ? alertLight.intensity : Math.max(0, alertLight.intensity - dt*8);
+
+  for(const m of monitors){
+    m.term.tick(dt, t, gameOn);
+    const s = m.term.state;
+    const tgt = s === 'dead' ? 0 : s === 'prompt' ? 2.4 + Math.sin(t*10)*.8 : .8;
+    m.light.intensity += (tgt - m.light.intensity) * Math.min(1, dt*8);
+    m.light.color.setHex(s === 'prompt' ? 0xff3344 : 0x33ff88);
+  }
+
+  /* --- animación del programador --- */
+  const type = gameOn ? 1 : .3;
+  if(wizard.mixer){
+    wizard.mixer.update(dt);
+    if(wizard.obj) wizard.obj.position.y = .6 + Math.sin(t*1.3)*.03;  // flota, es un sabio
+  } else {
+    armL.fore.rotation.x = -1.15 + Math.sin(t*10)*.08*type;
+    armR.fore.rotation.x = -1.15 + Math.sin(t*10 + 1.6)*.08*type;
+    torso.scale.y = 1 + Math.sin(t*1.8)*.012;                 // respiración
+    headG.position.y = 1.5 + Math.sin(t*1.8)*.008;
+    headG.rotation.z = Math.sin(t*.6)*.04;
+    // mira la pantalla que pide atención
+    const p = promptingScreens()[0];
+    const headTargetY = p ? (p.idx - 1) * .45 : Math.sin(t*.4)*.1;
+    const headTargetX = p ? .12 : Math.sin(t*.9)*.05;
+    headG.rotation.y += (headTargetY - headG.rotation.y) * Math.min(1, dt*5);
+    headG.rotation.x += (headTargetX - headG.rotation.x) * Math.min(1, dt*5);
+  }
+
+  // neon parpadeo sutil
+  neonLight.intensity = 3 + Math.sin(t*3)*.4;
+
+  composer.render();
+}
+animate();
+
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
