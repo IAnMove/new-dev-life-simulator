@@ -117,6 +117,25 @@
   #overlay a { color:#8fd6ff; text-decoration:none; }
   #overlay a:hover { text-shadow:0 0 10px rgba(140,220,255,.9); }
 
+  #touch-controls {
+    display:none; position:fixed; bottom:64px; left:0; right:0; z-index:11;
+    justify-content:center; align-items:center; gap:10px; pointer-events:none;
+  }
+  body.touch #touch-controls { display:flex; }
+  .tbtn {
+    pointer-events:auto; font-family:inherit; font-size:16px; letter-spacing:1px;
+    padding:12px 16px; color:#8fffb0; background:rgba(10,16,22,.55);
+    border:2px solid #2a4a3a; border-radius:10px; touch-action:manipulation;
+    user-select:none; -webkit-user-select:none;
+  }
+  .tbtn:active { background:rgba(40,80,60,.7); }
+  #t-yes { border-color:#3aff88; font-size:22px; font-weight:bold; padding:14px 26px; }
+  #t-no  { border-color:#ff5566; color:#ff8899; }
+  #t-yolo { border-color:#ffcc33; color:#ffcc33; display:none; }
+  #t-yolo.ready { display:block; animation:blink .6s infinite; }
+  body.touch #msg { bottom:130px; }
+  body.touch #vol-hud { pointer-events:auto; }
+
   #scanlines {
     position:fixed; inset:0; pointer-events:none; z-index:15; opacity:.10;
     background:repeating-linear-gradient(0deg, transparent 0 2px, #000 2px 4px);
@@ -163,6 +182,13 @@
   <div id="yolo-bar"><div id="yolo-fill"></div></div>
 </div>
 <div id="yolo-banner">🔥 YOLO MODE 🔥</div>
+<div id="touch-controls">
+  <button class="tbtn" id="t-left">◀</button>
+  <button class="tbtn" id="t-right">▶</button>
+  <button class="tbtn" id="t-yes">YES ✔</button>
+  <button class="tbtn" id="t-no">NO ✘</button>
+  <button class="tbtn" id="t-yolo">🔥 YOLO</button>
+</div>
 <div id="msg"></div>
 <div id="vol-hud">
   <span id="vol-label">♪ MUSIC</span> [ + / - ]
@@ -191,6 +217,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
+/* ================= TÁCTIL ================= */
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window || location.search.includes('touch');
+if(isTouch) document.body.classList.add('touch');
+
 /* ================= IDIOMAS ================= */
 const LANG = {
   en: {
@@ -213,7 +243,7 @@ const LANG = {
     promptTitle: '⚠ CONTINUE? [Y/N]',
     promptHelp: 'ENTER/Y = yes      N = no',
     noSignal: 'NO SIGNAL',
-    langFooter: 'LANGUAGE: <span class="key">1</span> ENGLISH &nbsp;·&nbsp; <span class="key">2</span> ESPAÑOL &nbsp;·&nbsp; ♪ VOL <span class="key">+</span><span class="key">-</span>',
+    langFooter: 'LANGUAGE: <span data-lang="en" style="cursor:pointer"><span class="key">1</span> ENGLISH</span> &nbsp;·&nbsp; <span data-lang="es" style="cursor:pointer"><span class="key">2</span> ESPAÑOL</span> &nbsp;·&nbsp; ♪ VOL <span class="key">+</span><span class="key">-</span>',
     introHtml: `
       <h1>PROGRAMMER<br>SIMULATOR <span>2026</span></h1>
       <p>The AI writes the code. You have the most important job:<br>
@@ -223,7 +253,7 @@ const LANG = {
       Lose all 3 screens and you'll be replaced. Survive 5 minutes.</p>
       <p>Fill the <b>YOLO</b> bar with good answers and hit <span class="key">SPACE</span>:<br>
       15 seconds of automatic YES, star-power style.</p>
-      <p class="pulse">[ PRESS ENTER TO CLOCK IN ]</p>`,
+      <p class="pulse">[ ${isTouch ? 'TAP' : 'PRESS ENTER'} TO CLOCK IN ]</p>`,
     overHtml: (score, time) => `
       <h2>ALL 3 SCREENS ARE DEAD</h2>
       <p>The AI has decided you're redundant.<br>
@@ -291,7 +321,7 @@ const LANG = {
     promptTitle: '⚠ ¿CONTINUAR? [Y/N]',
     promptHelp: 'ENTER/Y = sí      N = no',
     noSignal: 'SIN SEÑAL',
-    langFooter: 'IDIOMA: <span class="key">1</span> ENGLISH &nbsp;·&nbsp; <span class="key">2</span> ESPAÑOL &nbsp;·&nbsp; ♪ VOL <span class="key">+</span><span class="key">-</span>',
+    langFooter: 'IDIOMA: <span data-lang="en" style="cursor:pointer"><span class="key">1</span> ENGLISH</span> &nbsp;·&nbsp; <span data-lang="es" style="cursor:pointer"><span class="key">2</span> ESPAÑOL</span> &nbsp;·&nbsp; ♪ VOL <span class="key">+</span><span class="key">-</span>',
     introHtml: `
       <h1>PROGRAMMER<br>SIMULATOR <span>2026</span></h1>
       <p>La IA escribe el código. Tú tienes el trabajo más importante:<br>
@@ -301,7 +331,7 @@ const LANG = {
       Pierde las 3 pantallas y serás reemplazado. Sobrevive 5 minutos.</p>
       <p>Llena la barra <b>YOLO</b> acertando y pulsa <span class="key">ESPACIO</span>:<br>
       15 segundos de SÍ automático, estilo estrella de Mario.</p>
-      <p class="pulse">[ PULSA ENTER PARA FICHAR ]</p>`,
+      <p class="pulse">[ ${isTouch ? 'TOCA LA PANTALLA' : 'PULSA ENTER'} PARA FICHAR ]</p>`,
     overHtml: (score, time) => `
       <h2>LAS 3 PANTALLAS HAN MUERTO</h2>
       <p>La IA ha decidido que eres redundante.<br>
@@ -414,6 +444,14 @@ const camera = new THREE.PerspectiveCamera(48, innerWidth/innerHeight, .1, 100);
 const CAM_START = new THREE.Vector3(0, 10, 18);
 const CAM_BASE  = new THREE.Vector3(0.55, 2.05, 3.35);
 const CAM_LOOK  = new THREE.Vector3(0, 1.35, -1.0);
+const camBase = CAM_BASE.clone();
+function fitCamera(){
+  const portrait = innerWidth < innerHeight;
+  camBase.set(0.55, portrait ? 2.45 : 2.05, portrait ? 5.4 : 3.35);
+  camera.fov = portrait ? 62 : 48;
+  camera.updateProjectionMatrix();
+}
+fitCamera();
 camera.position.copy(CAM_START);
 
 const composer = new EffectComposer(renderer);
@@ -852,11 +890,21 @@ function renderIntro(){
   const on  = 'color:#3aff88;text-shadow:0 0 8px rgba(60,255,140,.8)';
   const off = 'color:#5a6478';
   const charaLine = `<p class="langsel">${S.charaLabel}: `
-    + `<span style="${chara==='dev' ? on : off}"><span class="key">3</span> ${S.charaDev}</span>`
+    + `<span data-chara="dev" style="cursor:pointer;${chara==='dev' ? on : off}"><span class="key">3</span> ${S.charaDev}</span>`
     + ` &nbsp;·&nbsp; `
-    + `<span style="${chara==='wizard' ? on : off}"><span class="key">4</span> ${S.charaWiz}</span></p>`;
+    + `<span data-chara="wizard" style="cursor:pointer;${chara==='wizard' ? on : off}"><span class="key">4</span> ${S.charaWiz}</span></p>`;
   setOverlay(S.introHtml + charaLine + `<p class="langsel">${S.langFooter}</p>`);
 }
+
+// taps/clics en el overlay: selectores o empezar/reiniciar
+overlay.addEventListener('click', e=>{
+  const l = e.target.closest('[data-lang]');
+  if(l){ setLang(l.dataset.lang); return; }
+  const c = e.target.closest('[data-chara]');
+  if(c){ setChara(c.dataset.chara); return; }
+  if(G.state === 'intro') startGame();
+  else if(G.state === 'over' || G.state === 'win') location.reload();
+});
 renderIntro();
 $('vol-label').textContent = S.musicLabel;
 $('credit').innerHTML = S.creditCorner;
@@ -876,6 +924,7 @@ function refreshYoloHud(){
   $('yolo-fill').style.width = (pct*100) + '%';
   $('yolo-fill').classList.toggle('full', G.yolo >= 1 || G.yoloActive > 0);
   $('yolo-hud').classList.toggle('full', G.yolo >= 1 && !G.yoloActive);
+  $('t-yolo').classList.toggle('ready', G.yolo >= 1 || G.yoloActive > 0);
 }
 
 function startGame(){
@@ -981,8 +1030,7 @@ function endYolo(silent){
   G.yoloActive = 0;
   bgm.playbackRate = 1;
   bloom.strength = .75;
-  camera.fov = 48;
-  camera.updateProjectionMatrix();
+  fitCamera();
   wizardGlow.intensity = 0;
   neonLight.color.setHex(0xff2fd6);
   playWizard(wizard.idle, .5);
@@ -1037,6 +1085,19 @@ addEventListener('keydown', e=>{
   }
 });
 
+/* --- controles táctiles --- */
+function bindTap(id, fn){
+  const el = $(id);
+  el.addEventListener('touchstart', e=>{ e.preventDefault(); fn(); }, { passive:false });
+  el.addEventListener('click', fn);
+}
+bindTap('t-left',  ()=>{ if(G.state==='playing') moveSel(-1); });
+bindTap('t-right', ()=>{ if(G.state==='playing') moveSel(1); });
+bindTap('t-yes',   ()=>{ if(G.state==='playing'){ devPunchT = 0; answerYes(); } });
+bindTap('t-no',    ()=>{ if(G.state==='playing'){ devPunchT = 0; answerNo(); } });
+bindTap('t-yolo',  ()=>{ tryYolo(); });
+$('vol-hud').addEventListener('click', ()=> setVol(bgm.volume >= 1 ? 0 : bgm.volume + .1));
+
 /* ================= BUCLE ================= */
 const clock = new THREE.Clock();
 let lastSec = -1;
@@ -1052,14 +1113,14 @@ function animate(){
   if(G.state === 'intro'){
     G.introT = Math.min(1, G.introT + dt/5);
     const k = G.introT*G.introT*(3-2*G.introT); // smoothstep
-    camera.position.lerpVectors(CAM_START, CAM_BASE, k);
+    camera.position.lerpVectors(CAM_START, camBase, k);
     camera.position.y += Math.sin(t*.8)*.15*(1-k);
     camera.lookAt(CAM_LOOK);
   } else {
     const sway = .04;
-    camera.position.x = CAM_BASE.x + selX*.5 + Math.sin(t*.5)*sway + mouse.x*.35;
-    camera.position.y = CAM_BASE.y + Math.sin(t*.7)*sway*.6 - mouse.y*.2;
-    camera.position.z = CAM_BASE.z - G.punch*.55;
+    camera.position.x = camBase.x + selX*.5 + Math.sin(t*.5)*sway + mouse.x*.35;
+    camera.position.y = camBase.y + Math.sin(t*.7)*sway*.6 - mouse.y*.2;
+    camera.position.z = camBase.z - G.punch*.55;
     G.punch = Math.max(0, G.punch - dt*2.2);
     if(G.shake > 0){
       camera.position.x += (Math.random()-.5)*G.shake;
@@ -1134,7 +1195,7 @@ function animate(){
     wizardGlow.color.setHSL((hue + .66) % 1, 1, .6);
     wizardGlow.intensity = 3;
     bloom.strength = .9 + .45*Math.abs(Math.sin(t*6));
-    camera.fov = 48 + Math.sin(t*10)*1.5;
+    camera.fov = (innerWidth < innerHeight ? 62 : 48) + Math.sin(t*10)*1.5;
     camera.updateProjectionMatrix();
     refreshYoloHud();
     if(G.yoloActive <= 0) endYolo();
@@ -1194,7 +1255,7 @@ animate();
 
 addEventListener('resize', ()=>{
   camera.aspect = innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
+  fitCamera();
   renderer.setSize(innerWidth, innerHeight);
   composer.setSize(innerWidth, innerHeight);
 });
